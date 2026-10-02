@@ -1,0 +1,1905 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>scikit-fem Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen workbench. Header strip, then script pane | viewer pane (stacked on phones). */
+:root {
+  --bg: #eef1f4;
+  --panel: #ffffff;
+  --panel-2: #f6f8fa;
+  --ink: #18212b;
+  --muted: #5b6876;
+  --line: #d3dae2;
+  --accent: #0d6a86;
+  --accent-ink: #ffffff;
+  --accent-soft: #d9eef4;
+  --ok: #2f8a4c;
+  --warn: #b7791f;
+  --bad: #c03a2b;
+  --canvas: #fbfcfd;
+  --edge: #1b2733;
+  --mesh-face: #c9d6e2;
+  --err-band: rgba(192, 58, 43, 0.12);
+  --sel: rgba(13, 106, 134, 0.22);
+  /* syntax */
+  --sx-kw: #8b2f8f; --sx-str: #2f7d32; --sx-num: #b4540a; --sx-com: #7b8794;
+  --sx-fn: #1d5fb4; --sx-cls: #0d7a7a; --sx-deco: #a0522d; --sx-bi: #6f42c1; --sx-op: #4a5663;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --code-size: 13px;
+  --code-lh: 20px;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1419; --panel: #151b22; --panel-2: #1a222b; --ink: #dce4eb; --muted: #8b99a8;
+    --line: #2a3542; --accent: #4cb2d0; --accent-ink: #062029; --accent-soft: #163845;
+    --ok: #58b878; --warn: #e0a84a; --bad: #ef6f5f;
+    --canvas: #10161c; --edge: #e4ecf3; --mesh-face: #3a4a5a;
+    --err-band: rgba(239, 111, 95, 0.16); --sel: rgba(76, 178, 208, 0.28);
+    --sx-kw: #d58fe0; --sx-str: #8fcf88; --sx-num: #f0a35e; --sx-com: #6d7b8a;
+    --sx-fn: #79b4f2; --sx-cls: #5fd0c8; --sx-deco: #e4a07a; --sx-bi: #b79cf2; --sx-op: #a9b6c3;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1419; --panel: #151b22; --panel-2: #1a222b; --ink: #dce4eb; --muted: #8b99a8;
+  --line: #2a3542; --accent: #4cb2d0; --accent-ink: #062029; --accent-soft: #163845;
+  --ok: #58b878; --warn: #e0a84a; --bad: #ef6f5f;
+  --canvas: #10161c; --edge: #e4ecf3; --mesh-face: #3a4a5a;
+  --err-band: rgba(239, 111, 95, 0.16); --sel: rgba(76, 178, 208, 0.28);
+  --sx-kw: #d58fe0; --sx-str: #8fcf88; --sx-num: #f0a35e; --sx-com: #6d7b8a;
+  --sx-fn: #79b4f2; --sx-cls: #5fd0c8; --sx-deco: #e4a07a; --sx-bi: #b79cf2; --sx-op: #a9b6c3;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.4 var(--font-ui);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- header ---------- */
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap; }
+.brand h1 span { color: var(--accent); }
+.status {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted);
+  padding: 3px 10px 3px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2);
+  max-width: 46ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.status::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex: none;
+}
+.status[data-state="ready"]::before { background: var(--ok); }
+.status[data-state="busy"]::before { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+.status[data-state="loading"]::before { animation: pulse 1.2s ease-in-out infinite; }
+.status[data-state="error"]::before { background: var(--bad); }
+@keyframes pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .status::before { animation: none !important; } }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.field-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+select, .btn, input[type="number"] {
+  height: 30px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
+  padding: 0 8px; font-size: 13px;
+}
+select { padding-right: 4px; max-width: 100%; }
+.btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 0 12px; background: var(--panel-2); }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.danger { color: var(--bad); }
+kbd { font: 11px var(--font-code); opacity: 0.75; }
+
+/* ---------- main split ---------- */
+main {
+  flex: 1; min-height: 0; display: grid;
+  grid-template-columns: minmax(280px, var(--left, 44%)) 6px minmax(0, 1fr);
+}
+.pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--panel); }
+.splitter { cursor: col-resize; background: var(--bg); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+.splitter:hover, .splitter.drag { background: var(--accent-soft); }
+.pane-head {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px; min-height: 36px;
+  border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted);
+}
+.pane-head b { color: var(--ink); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px; }
+.pane-head .spacer { flex: 1; }
+
+/* ---------- editor ---------- */
+.editor { flex: 1; min-height: 0; display: flex; position: relative; background: var(--panel-2); font: var(--code-size)/var(--code-lh) var(--font-code); }
+.gutter {
+  flex: none; width: 46px; overflow: hidden; color: var(--muted); text-align: right; user-select: none;
+  border-right: 1px solid var(--line); background: var(--panel);
+}
+.gutter-inner { padding: 10px 8px 10px 0; will-change: transform; }
+.gutter-inner div { height: var(--code-lh); font-variant-numeric: tabular-nums; opacity: 0.7; }
+.gutter-inner div.err { color: var(--bad); opacity: 1; font-weight: 500; }
+.code-wrap { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+.code-wrap pre, .code-wrap textarea {
+  position: absolute; inset: 0; margin: 0; padding: 10px 14px; border: 0;
+  font: inherit; white-space: pre; tab-size: 4; letter-spacing: 0; overflow: auto;
+}
+.code-wrap pre { pointer-events: none; color: var(--ink); overflow: hidden; }
+.code-wrap textarea {
+  resize: none; background: transparent; color: transparent; caret-color: var(--ink);
+  outline: none; -webkit-text-fill-color: transparent;
+}
+.code-wrap textarea::selection { background: var(--sel); -webkit-text-fill-color: transparent; }
+.err-band { position: absolute; left: 0; right: 0; height: var(--code-lh); background: var(--err-band); pointer-events: none; border-left: 3px solid var(--bad); }
+.t-kw { color: var(--sx-kw); font-weight: 500; }
+.t-str { color: var(--sx-str); }
+.t-num { color: var(--sx-num); }
+.t-com { color: var(--sx-com); font-style: italic; }
+.t-fn { color: var(--sx-fn); }
+.t-def { color: var(--sx-fn); font-weight: 500; }
+.t-cls { color: var(--sx-cls); }
+.t-deco { color: var(--sx-deco); }
+.t-bi { color: var(--sx-bi); }
+.t-op { color: var(--sx-op); }
+.t-self { color: var(--sx-kw); font-style: italic; }
+
+/* ---------- console ---------- */
+.console-wrap { flex: none; height: 30%; min-height: 90px; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.console {
+  flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 8px 12px; background: var(--panel);
+  font: 12px/1.5 var(--font-code); white-space: pre-wrap; word-break: break-word;
+}
+.console .err { color: var(--bad); }
+.console .info { color: var(--muted); }
+.console .ok { color: var(--ok); }
+
+/* ---------- viewer ---------- */
+.viewer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.viewer-bar .grp { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.viewer-bar select { height: 28px; font-size: 12.5px; }
+#fieldSel { min-width: 15em; max-width: 28em; font-family: var(--font-code); font-size: 12px; }
+.viewer-bar input[type="range"] { width: 92px; accent-color: var(--accent); }
+.viewer-bar input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.seg button { height: 26px; border: 0; background: var(--panel-2); padding: 0 8px; font-size: 12px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button:hover { background: var(--accent-soft); }
+.stage { position: relative; flex: 1; min-height: 0; background: var(--canvas); overflow: hidden; touch-action: none; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#view { cursor: grab; }
+#view.dragging { cursor: grabbing; }
+.overlay { position: absolute; pointer-events: none; font-size: 12px; color: var(--muted); }
+.info { left: 12px; top: 10px; line-height: 1.55; max-width: calc(100% - 120px); }
+.info b { color: var(--ink); font-weight: 600; }
+.info code { font: 12px var(--font-code); color: var(--ink); }
+.readout { left: 12px; bottom: 10px; font: 12px var(--font-code); color: var(--ink); background: color-mix(in srgb, var(--canvas) 80%, transparent); padding: 2px 6px; border-radius: 4px; }
+.hint { right: 12px; bottom: 10px; text-align: right; opacity: 0.85; }
+.cbar { right: 14px; top: 14px; display: grid; grid-template-columns: 14px auto; gap: 0 8px; align-items: stretch; }
+.cbar canvas { position: static; width: 14px; height: 180px; border: 1px solid var(--line); border-radius: 3px; }
+.cbar .ticks { position: relative; height: 180px; font: 11px var(--font-code); color: var(--ink); font-variant-numeric: tabular-nums; min-width: 56px; }
+.cbar .ticks span { position: absolute; left: 0; transform: translateY(-50%); white-space: nowrap; }
+.empty {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 6px;
+  color: var(--muted); padding: 24px; pointer-events: none;
+}
+.empty strong { color: var(--ink); font-weight: 600; font-size: 15px; }
+.empty .bar { width: 220px; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 6px auto 0; }
+.empty .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
+
+@media (max-width: 820px) {
+  body { overflow: auto; height: auto; }
+  main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
+  .splitter { display: none; }
+  .pane.left { height: 62vh; }
+  .pane.right { height: 75vh; border-top: 1px solid var(--line); }
+  .controls { margin-left: 0; }
+  .hint { display: none; }
+  #fieldSel { min-width: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1><span>scikit-fem</span> Workbench</h1>
+    <div id="status" class="status" data-state="loading" role="status" aria-live="polite">Starting Pyodide…</div>
+  </div>
+  <div class="controls">
+    <label class="field-lbl" for="exampleSel">Example
+      <select id="exampleSel"></select>
+    </label>
+    <label class="field-lbl" for="meshSel">Mesh
+      <select id="meshSel"></select>
+    </label>
+    <button id="runBtn" class="btn primary" disabled title="Run script (Ctrl/⌘ + Enter)">Run <kbd>⌘↵</kbd></button>
+    <button id="stopBtn" class="btn danger" hidden title="Terminate the Python worker and restart it">Stop</button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="pane left" aria-label="Script">
+    <div class="pane-head"><b>Script</b><span id="cursorPos">Ln 1, Col 1</span><span class="spacer"></span><span>Python · runs in your browser</span></div>
+    <div class="editor">
+      <div class="gutter"><div class="gutter-inner" id="gutter"></div></div>
+      <div class="code-wrap">
+        <pre id="hl" aria-hidden="true"></pre>
+        <div id="errBand" class="err-band" hidden></div>
+        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Python script"></textarea>
+      </div>
+    </div>
+    <div class="console-wrap">
+      <div class="pane-head"><b>Output</b><span class="spacer"></span><button id="clearBtn" class="btn" style="height:24px;font-size:12px;padding:0 8px">Clear</button></div>
+      <pre id="console" class="console" aria-live="polite"></pre>
+    </div>
+  </section>
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panes" tabindex="0"></div>
+  <section class="pane right" aria-label="Viewer">
+    <div class="viewer-bar">
+      <label class="grp" for="fieldSel">Field <select id="fieldSel" disabled><option>—</option></select></label>
+      <label class="grp" for="cmapSel">Colors
+        <select id="cmapSel">
+          <option value="viridis">viridis</option>
+          <option value="turbo">turbo</option>
+          <option value="coolwarm">coolwarm</option>
+          <option value="magma">magma</option>
+          <option value="grey">grey</option>
+        </select>
+      </label>
+      <label class="grp" for="bandSel">Levels
+        <select id="bandSel">
+          <option value="0">smooth</option>
+          <option value="8">8 bands</option>
+          <option value="12">12 bands</option>
+          <option value="20">20 bands</option>
+        </select>
+      </label>
+      <label class="grp" for="subSel" title="Evaluate the field at sub-element points (shows higher-order and curved elements)">Subdivide
+        <select id="subSel">
+          <option value="auto">auto</option>
+          <option value="0">off</option>
+          <option value="1">1×</option>
+          <option value="2">2×</option>
+          <option value="3">3×</option>
+        </select>
+      </label>
+      <label class="grp" for="edgeChk"><input type="checkbox" id="edgeChk" checked> Edges</label>
+      <span class="grp" id="warpGrp" hidden><label for="warpChk" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="warpChk"> Warp</label><input type="range" id="warpRng" min="0" max="100" value="35" aria-label="Warp height"></span>
+      <span class="grp" id="defGrp" hidden><label for="defChk" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="defChk"> Deform</label><input type="range" id="defRng" min="0" max="100" value="50" aria-label="Deformation scale"><span id="defLbl" style="font-family:var(--font-code)"></span></span>
+      <span class="grp" id="clipGrp" hidden>
+        <label for="clipSel">Clip</label>
+        <select id="clipSel"><option value="-1">off</option><option value="0">x</option><option value="1">y</option><option value="2">z</option></select>
+        <input type="range" id="clipRng" min="0" max="1000" value="500" aria-label="Clip plane position">
+        <label for="clipFlip" style="display:inline-flex;gap:4px;align-items:center"><input type="checkbox" id="clipFlip"> flip</label>
+      </span>
+      <span class="grp" id="viewGrp" hidden>
+        <span class="seg" role="group" aria-label="View direction">
+          <button data-view="iso" title="Isometric">Iso</button><button data-view="xy" title="Look along -z">XY</button><button data-view="xz" title="Look along +y">XZ</button><button data-view="yz" title="Look along -x">YZ</button>
+        </span>
+      </span>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="view" aria-label="Mesh and solution view"></canvas>
+      <div class="overlay info" id="info"></div>
+      <div class="overlay cbar" id="cbar" hidden><canvas id="cbarCv" width="14" height="180"></canvas><div class="ticks" id="cbarTicks"></div></div>
+      <div class="overlay readout" id="readout" hidden></div>
+      <div class="overlay hint" id="hint"></div>
+      <div class="empty" id="empty">
+        <strong id="emptyTitle">Loading Python</strong>
+        <span id="emptyMsg">Pyodide, NumPy, SciPy and scikit-fem are downloaded on first use (about 30 MB, cached afterwards).</span>
+        <div class="bar"><i id="loadBar"></i></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ======================= example scripts ======================= -->
+<script type="text/plain" data-example="poisson" data-title="Poisson" data-mesh="sq">
+# Poisson problem:  -Δu = 1 in Ω,  u = 0 on ∂Ω
+# The line starting with "m =" is rewritten by the Mesh menu.
+import numpy as np
+from skfem import *
+from skfem.helpers import dot, grad
+
+m = MeshTri.init_sqsymmetric().refined(3)
+
+basis = Basis(m, m.elem())   # P1/Q1 (P2 on quadratic meshes)
+
+@BilinearForm
+def laplace(u, v, w):
+    return dot(grad(u), grad(v))
+
+@LinearForm
+def load(v, w):
+    return 1.0 * v
+
+A = laplace.assemble(basis)
+b = load.assemble(basis)
+u = solve(*condense(A, b, D=basis.get_dofs()))
+
+print(f"{type(m).__name__}: {m.nelements} elements, {basis.N} dofs")
+print(f"max u = {u.max():.6f}")
+</script>
+<script type="text/plain" data-example="eigen" data-title="Laplace eigenmodes" data-mesh="lshape">
+# Laplace eigenmodes:  -Δu = λu in Ω,  u = 0 on ∂Ω
+# Columns of X are listed separately in the Field menu.
+import numpy as np
+from skfem import *
+from skfem.models.poisson import laplace, mass
+
+m = MeshTri.init_sqsymmetric().refined(3)
+
+basis = Basis(m, m.elem())
+K = laplace.assemble(basis)
+M = mass.assemble(basis)
+
+L, X = solve(*condense(K, M, D=basis.get_dofs()),
+             solver=solver_eigen_scipy_sym(k=6, sigma=0.0))
+
+for i, lam in enumerate(L):
+    print(f"λ_{i} = {lam:.4f}")
+</script>
+<script type="text/plain" data-example="elasticity" data-title="Linear elasticity" data-mesh="beam">
+# Linear elasticity: clamped at the left end, loaded by gravity.
+# The displacement u is a vector field: pick |·| or a component
+# in the Field menu and switch on "Deform".
+import numpy as np
+from skfem import *
+from skfem.models.elasticity import linear_elasticity, lame_parameters
+
+m = MeshTri.init_sqsymmetric().refined(3)
+
+E, nu = 1000.0, 0.3
+basis = Basis(m, ElementVector(m.elem()))
+
+K = linear_elasticity(*lame_parameters(E, nu)).assemble(basis)
+
+@LinearForm
+def gravity(v, w):
+    return -1.0 * v.value[-1]      # body force in -y (-z in 3D)
+
+f = gravity.assemble(basis)
+
+xmin = m.p[0].min()
+clamped = basis.get_dofs(lambda x: np.isclose(x[0], xmin))
+u = solve(*condense(K, f, D=clamped))
+
+print(f"{basis.N} dofs, max |u| = {np.abs(u).max():.4e}")
+</script>
+<script type="text/plain" data-example="flux" data-title="Flux post-processing" data-mesh="disk">
+# Post-processing: project the flux -∇u of a Poisson solution
+# onto a discontinuous vector space, plus an element-wise
+# error indicator (one value per element).
+import numpy as np
+from skfem import *
+from skfem.helpers import dot, grad
+
+m = MeshTri.init_sqsymmetric().refined(3)
+
+basis = Basis(m, m.elem())
+
+@BilinearForm
+def laplace(u, v, w):
+    return dot(grad(u), grad(v))
+
+@LinearForm
+def load(v, w):
+    x = w.x
+    return np.exp(-20 * np.sum((x - 0.5) ** 2, axis=0)) * v
+
+u = solve(*condense(laplace.assemble(basis), load.assemble(basis),
+                    D=basis.get_dofs()))
+
+# flux in a discontinuous vector space
+dbasis = basis.with_element(ElementVector(ElementDG(m.elem())))
+flux = dbasis.project(-basis.interpolate(u).grad)
+
+# element-wise L2 norm of the flux: one number per element
+@Functional
+def fluxnorm(w):
+    return dot(w['q'], w['q'])
+
+eta = np.sqrt(fluxnorm.elemental(dbasis, q=dbasis.interpolate(flux)))
+print(f"{m.nelements} elements, mean element flux² = {eta.mean():.3e}")
+</script>
+
+<!-- ======================= Python side helper ======================= -->
+<script type="text/plain" id="py-helper">
+# Helper that runs inside Pyodide next to the user's script.
+# _viz_run(code)          -> JSON: list of meshes / plottable fields found in the namespace
+# _viz_payload(i, nref)   -> dict of bytes/json describing one item for the canvas renderer
+import sys, json, time, traceback, linecache
+import numpy as np
+import skfem
+from skfem import (Mesh, CellBasis, FacetBasis, MeshLine1, MeshTri1, MeshQuad1,
+                   MeshTet1, MeshHex1, ElementLineP1, ElementTriP1, ElementQuad1,
+                   ElementTetP1, ElementHex1, ElementLineP0, ElementTriP0,
+                   ElementQuad0, ElementTetP0, ElementHex0)
+from skfem.element import ElementComposite
+from skfem.refdom import RefLine, RefTri, RefQuad, RefTet, RefHex
+
+_LIN = {
+    RefLine: (MeshLine1, ElementLineP1, ElementLineP0, 'line'),
+    RefTri: (MeshTri1, ElementTriP1, ElementTriP0, 'tri'),
+    RefQuad: (MeshQuad1, ElementQuad1, ElementQuad0, 'quad'),
+    RefTet: (MeshTet1, ElementTetP1, ElementTetP0, 'tet'),
+    RefHex: (MeshHex1, ElementHex1, ElementHex0, 'hex'),
+}
+
+_NS = {}
+_ITEMS = []
+_MAXCOLS = 64
+
+
+def _ename(e):
+    n = type(e).__name__
+    inner = getattr(e, 'elem', None)
+    if inner is not None and n == 'ElementVector':
+        return 'ElementVector(%s)' % _ename(inner)
+    if n == 'ElementDG' and inner is not None:
+        return 'ElementDG(%s)' % _ename(inner)
+    return n
+
+
+def _supported(mesh):
+    return mesh.refdom in _LIN
+
+
+def _walk(ns):
+    """Yield (label, value) for namespace entries, one level into containers."""
+    for k, v in list(ns.items()):
+        if k.startswith('_') or k in ('In', 'Out'):
+            continue
+        yield k, v
+        if isinstance(v, dict) and len(v) <= 32:
+            for kk, vv in v.items():
+                if isinstance(kk, (str, int)):
+                    yield '%s[%r]' % (k, kk), vv
+        elif isinstance(v, (list, tuple)) and len(v) <= 32:
+            for i, vv in enumerate(v):
+                yield '%s[%d]' % (k, i), vv
+
+
+def _tind(basis):
+    t = getattr(basis, 'tind', None)
+    if t is None:
+        return np.arange(basis.mesh.nelements)
+    return np.asarray(t)
+
+
+def _probe_rank(basis, arr):
+    """Shape of the interpolated value at a single point (scalar -> ())."""
+    mesh = basis.mesh
+    X = np.mean(mesh.refdom.p, axis=1)[:, None]
+    tb = CellBasis(mesh, basis.elem, mapping=basis.mapping,
+                   quadrature=(X, np.ones(1)), elements=_tind(basis)[:1])
+    val = tb.interpolate(arr).value
+    return val.shape[:-2]
+
+
+def _basis_label(name, b):
+    return '%s: %s on %s' % (name, _ename(b.elem), type(b.mesh).__name__)
+
+
+def _add_field(items, label, arr, basis, bname, col=None):
+    """Register scalar/vector components of arr living in basis."""
+    if isinstance(basis.elem, ElementComposite):
+        try:
+            parts = basis.split(arr)
+        except Exception:
+            return
+        for i, (a, b) in enumerate(parts):
+            _add_field(items, '%s.split[%d]' % (label, i), a, b, bname, None)
+        return
+    try:
+        shape = _probe_rank(basis, arr)
+    except Exception:
+        return
+    base = dict(kind='field', basis=basis, arr=arr, bname=bname)
+    sub = _ename(basis.elem)
+    if len(shape) == 0:
+        items.append(dict(base, label=label, comp=None, sub=sub))
+    elif len(shape) == 1:
+        d = shape[0]
+        items.append(dict(base, label='%s  |·|' % label, comp='mag', ncomp=d, sub=sub))
+        for c in range(d):
+            items.append(dict(base, label='%s  [%d]' % (label, c), comp=c, ncomp=d, sub=sub))
+    elif len(shape) == 2:
+        items.append(dict(base, label='%s  |·|F' % label, comp='mag', ncomp=0, sub=sub))
+        for i in range(shape[0]):
+            for j in range(shape[1]):
+                items.append(dict(base, label='%s  [%d,%d]' % (label, i, j),
+                                  comp=(i, j), ncomp=0, sub=sub))
+
+
+def _inspect(ns):
+    meshes, bases, arrays = [], [], []
+    seen_b = set()
+    for name, v in _walk(ns):
+        if isinstance(v, Mesh):
+            if all(v is not m for _, m in meshes):
+                meshes.append((name, v))
+        elif isinstance(v, CellBasis):
+            if _supported(v.mesh):
+                key = (id(v.mesh), v.N, _ename(v.elem), len(_tind(v)))
+                if key not in seen_b:
+                    seen_b.add(key)
+                    bases.append((name, v))
+        elif isinstance(v, FacetBasis):
+            if _supported(v.mesh):
+                try:
+                    cb = CellBasis(v.mesh, v.elem)
+                except Exception:
+                    continue
+                key = (id(cb.mesh), cb.N, _ename(cb.elem), len(_tind(cb)))
+                if key not in seen_b:
+                    seen_b.add(key)
+                    bases.append((name + '→cell', cb))
+        elif (isinstance(v, np.ndarray) and v.dtype.kind in 'fiuc'
+              and v.ndim in (1, 2) and v.size > 0):
+            arrays.append((name, v))
+    for name, b in bases:
+        if all(b.mesh is not m for _, m in meshes):
+            meshes.append(('%s.mesh' % name, b.mesh))
+
+    items = []
+    for name, m in meshes:
+        if _supported(m):
+            items.append(dict(kind='mesh', label=name, mesh=m,
+                              sub='%s, %d elements' % (type(m).__name__, m.nelements)))
+
+    for aname, a in arrays:
+        a = a.real if a.dtype.kind == 'c' else a
+        a = a.astype(np.float64, copy=False)
+        hit = False
+        for bname, b in bases:
+            if a.ndim == 1 and a.shape[0] == b.N:
+                _add_field(items, aname, a, b, bname)
+                hit = True
+            elif a.ndim == 2:
+                if a.shape[0] == b.N and a.shape[1] <= _MAXCOLS:
+                    for j in range(a.shape[1]):
+                        _add_field(items, '%s[:, %d]' % (aname, j), a[:, j], b, bname)
+                    hit = True
+                elif a.shape[1] == b.N and a.shape[0] <= _MAXCOLS:
+                    for j in range(a.shape[0]):
+                        _add_field(items, '%s[%d]' % (aname, j), a[j], b, bname)
+                    hit = True
+        if hit or a.ndim != 1:
+            continue
+        # raw arrays on a mesh: one value per vertex or per element
+        for mname, m in meshes:
+            if not _supported(m):
+                continue
+            lm, P1, P0, _ = _LIN[m.refdom]
+            if type(m) is lm or isinstance(m, lm) and m.p.shape[1] == len(np.unique(m.t)):
+                if a.shape[0] == m.p.shape[1]:
+                    b = CellBasis(m, P1(), intorder=1)
+                    _add_field(items, aname + ' (vertex values)', a, b, mname)
+                    continue
+            if a.shape[0] == m.nelements:
+                b = CellBasis(m, P0(), intorder=1)
+                _add_field(items, aname + ' (element values)', a, b, mname)
+    return items
+
+
+def _public(items):
+    out = []
+    for i, it in enumerate(items):
+        d = dict(id=i, kind=it['kind'], label=it['label'], sub=it.get('sub', ''))
+        if it['kind'] == 'field':
+            b = it['basis']
+            d['basis'] = it['bname']
+            d['N'] = int(b.N)
+            d['mesh'] = type(b.mesh).__name__
+            d['vector'] = it.get('comp') is not None
+            d['ncomp'] = int(it.get('ncomp', 0) or 0)
+        out.append(d)
+    return out
+
+
+def _clean_tb(e):
+    tbe = traceback.TracebackException.from_exception(e)
+    stack = [f for f in tbe.stack if f.filename != __file__ and
+             not f.filename.endswith('viz_helper.py') and f.filename != '<exec>']
+    tbe.stack = traceback.StackSummary.from_list(stack)
+    line = None
+    for f in stack:
+        if f.filename == '<editor>':
+            line = f.lineno
+    if isinstance(e, SyntaxError) and e.filename == '<editor>':
+        line = e.lineno
+    return ''.join(tbe.format()), line
+
+
+def _viz_run(code):
+    global _NS, _ITEMS
+    ns = {'__name__': '__main__'}
+    err, errline = None, None
+    linecache.cache['<editor>'] = (len(code), None, code.splitlines(True), '<editor>')
+    t0 = time.perf_counter()
+    try:
+        exec(compile(code, '<editor>', 'exec'), ns)
+    except BaseException as e:   # noqa
+        err, errline = _clean_tb(e)
+    elapsed = time.perf_counter() - t0
+    sys.stdout.flush()
+    _NS = ns
+    try:
+        _ITEMS = _inspect(ns)
+        ierr = None
+    except Exception as e:
+        _ITEMS = []
+        ierr = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+    return json.dumps(dict(error=err, errline=errline, elapsed=elapsed,
+                           items=_public(_ITEMS), inspect_error=ierr))
+
+
+def _cyclic(P, idx):
+    """Order local vertex indices idx cyclically (P: dim x n reference coords)."""
+    Q = P[:, idx]
+    c = Q.mean(axis=1, keepdims=True)
+    D = Q - c
+    if P.shape[0] == 2:
+        u, v = np.array([1.0, 0.0]), np.array([0.0, 1.0])
+    else:
+        n = np.cross(D[:, 0], D[:, 1])
+        if np.linalg.norm(n) < 1e-12:
+            n = np.cross(D[:, 0], D[:, 2])
+        n = n / np.linalg.norm(n)
+        u = D[:, 0] / np.linalg.norm(D[:, 0])
+        v = np.cross(n, u)
+    ang = np.arctan2(v @ D, u @ D)
+    return [int(idx[i]) for i in np.argsort(ang)]
+
+
+def _refsub(refdom, nref):
+    lm = _LIN[refdom][0]
+    R = lm.init_refdom()
+    if nref > 0:
+        R = R.refined(nref)
+    return R
+
+
+def _sub_edges(refdom, R):
+    """Sub-cell edges lying on the reference element's edges (for wireframe)."""
+    dim = refdom.p.shape[0]
+    if dim == 1:
+        return np.zeros((2, 0), dtype=np.int64)
+    if dim == 2:
+        return R.facets[:, R.boundary_facets()]
+    E = R.edges
+    ref_e = np.array(refdom.edges).T
+    A, B = refdom.p[:, ref_e[0]], refdom.p[:, ref_e[1]]
+    keep = np.zeros(E.shape[1], dtype=bool)
+    for k in range(A.shape[1]):
+        a, d = A[:, k:k+1], B[:, k:k+1] - A[:, k:k+1]
+        ok = np.ones(E.shape[1], dtype=bool)
+        for end in (0, 1):
+            q = R.p[:, E[end]] - a
+            t = (d[:, 0] @ q) / (d[:, 0] @ d[:, 0])
+            r = q - d * t
+            ok &= (np.linalg.norm(r, axis=0) < 1e-9) & (t > -1e-9) & (t < 1 + 1e-9)
+        keep |= ok
+    return E[:, keep]
+
+
+def _viz_payload(idx, nref=0):
+    it = _ITEMS[int(idx)]
+    nref = int(nref)
+    if it['kind'] == 'mesh':
+        mesh = it['mesh']
+        basis = None
+        tind = np.arange(mesh.nelements)
+        mapping = mesh._mapping()
+    else:
+        basis = it['basis']
+        mesh = basis.mesh
+        tind = _tind(basis)
+        mapping = basis.mapping
+    refdom = mesh.refdom
+    _, _, _, ctype = _LIN[refdom]
+    dim = refdom.p.shape[0]
+    R = _refsub(refdom, nref)
+    X = R.p
+    nloc, nsub = X.shape[1], R.t.shape[1]
+    nel = len(tind)
+
+    pts = mapping.F(X, tind=tind)                 # (gdim, nel, nloc)
+    gdim = pts.shape[0]
+    P = np.ascontiguousarray(pts.transpose(1, 2, 0).reshape(-1, gdim))
+
+    C = (R.t.T[None, :, :] + nloc * np.arange(nel)[:, None, None]).reshape(-1, R.t.shape[0])
+    Es = _sub_edges(refdom, R)
+    E = (Es.T[None, :, :] + nloc * np.arange(nel)[:, None, None]).reshape(-1, 2)
+
+    meta = dict(ctype=ctype, dim=dim, gdim=gdim, nloc=nloc, nsub=nsub,
+                epe=int(Es.shape[1]), nel=int(nel), nvc=int(R.t.shape[0]),
+                mesh=type(mesh).__name__, nvertices=int(mesh.nvertices),
+                nelements=int(mesh.nelements), label=it['label'])
+
+    # local face lists (3D) / cyclic polygon order (2D)
+    if dim == 3:
+        meta['faces'] = [_cyclic(refdom.p, np.array(f)) for f in refdom.facets]
+    elif dim == 2:
+        meta['poly'] = _cyclic(refdom.p, np.arange(refdom.p.shape[1]))
+
+    out = {}
+    V = None
+    D = None
+    if basis is not None:
+        vb = CellBasis(mesh, basis.elem, mapping=mapping,
+                       quadrature=(X, np.ones(nloc)), elements=tind)
+        val = np.asarray(vb.interpolate(it['arr']).value, dtype=np.float64)
+        comp = it.get('comp')
+        if comp is None:
+            V = val
+        elif comp == 'mag':
+            V = np.sqrt(np.sum(val.reshape(-1, nel, nloc) ** 2, axis=0))
+        elif isinstance(comp, tuple):
+            V = val[comp[0], comp[1]]
+        else:
+            V = val[comp]
+        if comp is not None and val.ndim == 3 and val.shape[0] == gdim:
+            D = val.transpose(1, 2, 0).reshape(-1, gdim)
+        V = V.reshape(-1)
+        meta['basis'] = it['bname']
+        meta['element'] = _ename(basis.elem)
+        meta['N'] = int(basis.N)
+        fin = V[np.isfinite(V)]
+        meta['vmin'] = float(fin.min()) if fin.size else 0.0
+        meta['vmax'] = float(fin.max()) if fin.size else 1.0
+        out['V'] = V.astype(np.float32).tobytes()
+        if D is not None:
+            out['D'] = np.ascontiguousarray(D, dtype=np.float32).tobytes()
+            meta['dmax'] = float(np.max(np.linalg.norm(D, axis=1))) if D.size else 0.0
+
+    if dim >= 2:
+        # weld coincident points (elements are stored discontinuously)
+        span = np.ptp(P, axis=0).max() or 1.0
+        q = np.round((P - P.min(axis=0)) / span * (2 ** 20 - 1)).astype(np.int64)
+        key = q[:, 0]
+        for k in range(1, gdim):
+            key = (key << 21) | q[:, k]
+        _, W = np.unique(key, return_inverse=True)
+        out['W'] = W.reshape(-1).astype(np.int32).tobytes()
+    if dim == 1:
+        out['Pv'] = np.ascontiguousarray(mesh.p[0], dtype=np.float32).tobytes()
+
+    out['P'] = P.astype(np.float32).tobytes()
+    out['C'] = C.astype(np.int32).tobytes()
+    out['E'] = E.astype(np.int32).tobytes()
+    out['meta'] = json.dumps(meta)
+    return out
+</script>
+
+<!-- ======================= Web Worker running Pyodide ======================= -->
+<script type="text/plain" id="worker-src">
+let pyodide = null, runFn = null, payloadFn = null;
+const post = (m, t) => self.postMessage(m, t || []);
+self.onmessage = async (ev) => {
+  const msg = ev.data;
+  try {
+    if (msg.cmd === 'init') {
+      post({ type: 'progress', text: 'Loading Pyodide runtime…', frac: 0.05 });
+      importScripts(msg.indexURL + 'pyodide.js');
+      pyodide = await loadPyodide({ indexURL: msg.indexURL });
+      pyodide.setStdout({ batched: (s) => post({ type: 'stdout', text: s }) });
+      pyodide.setStderr({ batched: (s) => post({ type: 'stderr', text: s }) });
+      post({ type: 'progress', text: 'Loading NumPy and SciPy…', frac: 0.3 });
+      await pyodide.loadPackage(['numpy', 'scipy', 'micropip']);
+      post({ type: 'progress', text: 'Installing scikit-fem…', frac: 0.8 });
+      pyodide.globals.set('_SKFEM_SPEC', msg.skfem);
+      await pyodide.runPythonAsync('import micropip\nawait micropip.install(_SKFEM_SPEC)');
+      pyodide.FS.writeFile('/home/pyodide/viz_helper.py', msg.helper);
+      pyodide.runPython('import sys\nsys.path.insert(0, "/home/pyodide")\nimport viz_helper');
+      const vh = pyodide.pyimport('viz_helper');
+      runFn = vh._viz_run; payloadFn = vh._viz_payload;
+      const ver = pyodide.runPython('import skfem, numpy, scipy, sys\n"scikit-fem %s · NumPy %s · SciPy %s · Python %d.%d" % (skfem.__version__, numpy.__version__, scipy.__version__, *sys.version_info[:2])');
+      post({ type: 'ready', version: ver, pyodide: pyodide.version });
+    } else if (msg.cmd === 'run') {
+      const json = runFn(msg.code);
+      post({ type: 'result', id: msg.id, json });
+    } else if (msg.cmd === 'payload') {
+      const res = payloadFn(msg.item, msg.nref);
+      const obj = res.toJs({ dict_converter: Object.fromEntries });
+      res.destroy();
+      const out = { meta: obj.meta }, transfer = [];
+      for (const k of ['P', 'C', 'E', 'V', 'D', 'W', 'Pv']) {
+        if (obj[k]) { const b = obj[k].slice().buffer; out[k] = b; transfer.push(b); }
+      }
+      post({ type: 'payload', id: msg.id, data: out }, transfer);
+    }
+  } catch (err) {
+    post({ type: 'error', id: msg.id, cmd: msg.cmd, text: String(err && err.message || err) });
+  }
+};
+</script>
+
+<script>
+'use strict';
+/* =====================================================================
+   Configuration
+   ===================================================================== */
+const params = new URLSearchParams(location.search);
+const PYODIDE_URL = params.get('pyodide') || 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/';
+const SKFEM_SPEC = params.get('skfem') || 'scikit-fem';
+
+const MESHES = [
+  { id: 'line',   label: 'Interval · 1D',            code: 'MeshLine(np.linspace(0, 1, 21))' },
+  { id: 'sq',     label: 'Square · triangles',       code: 'MeshTri.init_sqsymmetric().refined(3)' },
+  { id: 'quad',   label: 'Square · quads',           code: 'MeshQuad().refined(4)' },
+  { id: 'disk',   label: 'Disk · triangles',         code: 'MeshTri.init_circle(4)' },
+  { id: 'diskp2', label: 'Disk · curved P2',         code: 'MeshTri2.init_circle(2)' },
+  { id: 'lshape', label: 'L-shape · triangles',      code: 'MeshTri.init_lshaped().refined(3)' },
+  { id: 'beam',   label: 'Beam 4×1 · triangles',     code: 'MeshTri.init_tensor(np.linspace(0, 4, 33), np.linspace(0, 1, 9))' },
+  { id: 'cube',   label: 'Cube · tetrahedra',        code: 'MeshTet().refined(3)' },
+  { id: 'hex',    label: 'Cube · hexahedra',         code: 'MeshHex().refined(3)' },
+  { id: 'ball',   label: 'Ball · tetrahedra',        code: 'MeshTet.init_ball(2)' },
+  { id: 'beam3',  label: 'Beam 4×1×1 · hexahedra',   code: 'MeshHex.init_tensor(np.linspace(0, 4, 17), np.linspace(0, 1, 5), np.linspace(0, 1, 5))' },
+];
+const M_LINE = /^m\s*=\s*(.*)$/m;
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem('skfem-wb:' + k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem('skfem-wb:' + k, v); } catch (e) { /* ignore */ } },
+};
+
+/* =====================================================================
+   Python syntax highlighting editor
+   ===================================================================== */
+const KW = new Set('False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case'.split(' '));
+const BI = new Set('print len range enumerate zip abs min max sum float int str list dict tuple set isinstance type map filter sorted reversed any all round open super object property staticmethod classmethod getattr setattr hasattr iter next divmod pow complex bool repr format vars dir id hash slice ValueError TypeError Exception RuntimeError KeyError IndexError NotImplementedError'.split(' '));
+const TOKEN_RX = /(#[^\n]*)|((?:\b[rRbBuUfF]{1,2})?(?:'''[\s\S]*?(?:'''|$)|"""[\s\S]*?(?:"""|$)|'(?:\\.|[^'\\\n])*'?|"(?:\\.|[^"\\\n])*"?))|((?:\b0[xXoObB][\da-fA-F_]+|(?:\b\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(?:[eE][+-]?\d+)?j?))|([A-Za-z_][A-Za-z0-9_]*)|([^\sA-Za-z0-9_])/g;
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function highlight(src) {
+  let out = '', last = 0, prevWord = '', decoLine = false, m;
+  TOKEN_RX.lastIndex = 0;
+  while ((m = TOKEN_RX.exec(src))) {
+    if (m.index > last) {
+      const gap = src.slice(last, m.index);
+      if (gap.includes('\n')) decoLine = false;
+      out += esc(gap);
+    }
+    const t = m[0];
+    let cls = null;
+    if (m[1]) cls = 't-com';
+    else if (m[2]) cls = 't-str';
+    else if (m[3]) cls = 't-num';
+    else if (m[4]) {
+      if (decoLine) cls = 't-deco';
+      else if (KW.has(t)) cls = 't-kw';
+      else if (prevWord === 'def' || prevWord === 'class') cls = 't-def';
+      else if (t === 'self' || t === 'cls') cls = 't-self';
+      else if (BI.has(t) && src[TOKEN_RX.lastIndex] === '(') cls = 't-bi';
+      else if (/^[A-Z][a-z0-9]+[A-Z0-9]\w*$|^[A-Z][a-z]\w*$/.test(t) && !/^[A-Z][A-Z0-9_]*$/.test(t)) cls = 't-cls';
+      else if (src[TOKEN_RX.lastIndex] === '(') cls = 't-fn';
+      prevWord = t;
+    } else if (m[5]) {
+      if (t === '@') {
+        const ls = src.lastIndexOf('\n', m.index - 1) + 1;
+        if (/^[ \t]*$/.test(src.slice(ls, m.index))) { decoLine = true; cls = 't-deco'; }
+        else cls = 't-op';
+      } else if (decoLine && t === '.') cls = 't-deco';
+      else { cls = 't-op'; if (t === '(') decoLine = false; }
+      prevWord = '';
+    }
+    out += cls ? `<span class="${cls}">${esc(t)}</span>` : esc(t);
+    last = TOKEN_RX.lastIndex;
+    if (m[1] || m[2]) decoLine = false;
+  }
+  out += esc(src.slice(last));
+  return out + '\n';
+}
+
+const ta = $('code'), hl = $('hl'), gutter = $('gutter'), errBand = $('errBand');
+let errLine = null, hlQueued = false, nLines = 0;
+
+function refreshEditor() {
+  hlQueued = false;
+  const src = ta.value;
+  hl.innerHTML = highlight(src);
+  const n = src.split('\n').length;
+  if (n !== nLines || gutter.dataset.err !== String(errLine)) {
+    nLines = n;
+    let g = '';
+    for (let i = 1; i <= n; i++) g += i === errLine ? `<div class="err">${i}</div>` : `<div>${i}</div>`;
+    gutter.innerHTML = g;
+    gutter.dataset.err = String(errLine);
+  }
+  syncScroll();
+}
+function queueRefresh() { if (!hlQueued) { hlQueued = true; requestAnimationFrame(refreshEditor); } }
+function syncScroll() {
+  hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft;
+  gutter.style.transform = `translateY(${-ta.scrollTop}px)`;
+  if (errLine) {
+    const lh = parseFloat(getComputedStyle(ta).lineHeight) || 20;
+    errBand.style.top = (10 + (errLine - 1) * lh - ta.scrollTop) + 'px';
+  }
+}
+function setError(line) {
+  errLine = line || null;
+  errBand.hidden = !errLine;
+  gutter.dataset.err = '';
+  refreshEditor();
+}
+function updateCursor() {
+  const pre = ta.value.slice(0, ta.selectionStart);
+  const ln = pre.split('\n').length, col = pre.length - pre.lastIndexOf('\n');
+  $('cursorPos').textContent = `Ln ${ln}, Col ${col}`;
+}
+function insertText(text) {
+  ta.focus();
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
+  if (!ok) { ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end'); }
+  onEdit();
+}
+function selectLines() {
+  const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd;
+  const ls = v.lastIndexOf('\n', s - 1) + 1;
+  let le = v.indexOf('\n', e > s && v[e - 1] === '\n' ? e - 1 : e);
+  if (le < 0) le = v.length;
+  return [ls, le];
+}
+function transformLines(fn) {
+  const [ls, le] = selectLines();
+  const block = ta.value.slice(ls, le);
+  const out = block.split('\n').map(fn).join('\n');
+  ta.setSelectionRange(ls, le);
+  insertText(out);
+  ta.setSelectionRange(ls, ls + out.length);
+}
+ta.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key === 'Enter') { e.preventDefault(); runScript(); return; }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const multi = ta.value.slice(ta.selectionStart, ta.selectionEnd).includes('\n');
+    if (e.shiftKey) transformLines((l) => l.replace(/^ {1,4}/, ''));
+    else if (multi) transformLines((l) => '    ' + l);
+    else insertText('    ');
+    return;
+  }
+  if (mod && e.key === '/') {
+    e.preventDefault();
+    const [ls, le] = selectLines();
+    const lines = ta.value.slice(ls, le).split('\n');
+    const allC = lines.filter((l) => l.trim()).every((l) => /^\s*#/.test(l));
+    transformLines((l) => allC ? l.replace(/^(\s*)# ?/, '$1') : (l.trim() ? l.replace(/^(\s*)/, '$1# ') : l));
+    return;
+  }
+  if (e.key === 'Enter' && !e.shiftKey && !mod && !e.altKey) {
+    e.preventDefault();
+    const v = ta.value, s = ta.selectionStart;
+    const ls = v.lastIndexOf('\n', s - 1) + 1;
+    const line = v.slice(ls, s);
+    let ind = line.match(/^[ \t]*/)[0];
+    if (/:\s*(#.*)?$/.test(line)) ind += '    ';
+    else if (/^\s*(return|pass|break|continue|raise)\b/.test(line)) ind = ind.slice(0, Math.max(0, ind.length - 4));
+    insertText('\n' + ind);
+    return;
+  }
+  if (e.key === 'Backspace' && ta.selectionStart === ta.selectionEnd) {
+    const v = ta.value, s = ta.selectionStart;
+    const ls = v.lastIndexOf('\n', s - 1) + 1;
+    const before = v.slice(ls, s);
+    if (before.length >= 4 && /^ +$/.test(before)) {
+      e.preventDefault();
+      const k = before.length % 4 || 4;
+      ta.setSelectionRange(s - k, s);
+      insertText('');
+    }
+  }
+});
+function onEdit() {
+  queueRefresh(); updateCursor(); syncMeshSelect();
+  if (errLine) setError(null);
+  store.set('script', ta.value);
+}
+ta.addEventListener('input', onEdit);
+ta.addEventListener('scroll', syncScroll);
+ta.addEventListener('keyup', updateCursor);
+ta.addEventListener('click', updateCursor);
+
+/* =====================================================================
+   Examples & mesh presets
+   ===================================================================== */
+const EXAMPLES = [...document.querySelectorAll('script[data-example]')].map((s) => ({
+  id: s.dataset.example, title: s.dataset.title, mesh: s.dataset.mesh,
+  code: s.textContent.replace(/^\n/, '').replace(/\s+$/, '') + '\n',
+}));
+const exampleSel = $('exampleSel'), meshSel = $('meshSel');
+for (const ex of EXAMPLES) exampleSel.add(new Option(ex.title, ex.id));
+exampleSel.add(new Option('Custom', 'custom'));
+for (const m of MESHES) meshSel.add(new Option(m.label, m.id));
+meshSel.add(new Option('Custom (edited in script)', 'custom'));
+
+function syncMeshSelect() {
+  const mm = ta.value.match(M_LINE);
+  const code = mm ? mm[1].trim() : null;
+  const hit = MESHES.find((x) => x.code === code);
+  meshSel.value = hit ? hit.id : 'custom';
+}
+function setMeshLine(code) {
+  const v = ta.value;
+  const mm = v.match(M_LINE);
+  let nv;
+  if (mm) nv = v.slice(0, mm.index) + 'm = ' + code + v.slice(mm.index + mm[0].length);
+  else nv = 'm = ' + code + '\n' + v;
+  ta.focus();
+  ta.setSelectionRange(0, v.length);
+  insertText(nv);
+  ta.setSelectionRange(0, 0); ta.scrollTop = 0;
+}
+function loadExample(id, keepMesh) {
+  const ex = EXAMPLES.find((x) => x.id === id);
+  if (!ex) return;
+  let code = ex.code;
+  const meshCode = keepMesh || MESHES.find((x) => x.id === ex.mesh).code;
+  code = code.replace(M_LINE, 'm = ' + meshCode);
+  ta.value = code;
+  ta.setSelectionRange(0, 0); ta.scrollTop = 0;
+  exampleSel.value = id;
+  onEdit();
+}
+exampleSel.addEventListener('change', () => {
+  if (exampleSel.value === 'custom') return;
+  loadExample(exampleSel.value);
+  resetDisplayOptions();
+  if (ready) runScript();
+});
+meshSel.addEventListener('change', () => {
+  const m = MESHES.find((x) => x.id === meshSel.value);
+  if (!m) return;
+  setMeshLine(m.code);
+  if (ready) runScript();
+});
+
+/* =====================================================================
+   Console
+   ===================================================================== */
+const con = $('console');
+function log(text, cls) {
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = text.endsWith('\n') ? text : text + '\n';
+  con.appendChild(span);
+  con.scrollTop = con.scrollHeight;
+}
+$('clearBtn').addEventListener('click', () => { con.textContent = ''; });
+
+/* =====================================================================
+   Worker
+   ===================================================================== */
+const statusEl = $('status'), runBtn = $('runBtn'), stopBtn = $('stopBtn');
+let worker = null, ready = false, busy = false, reqId = 0, runCount = 0;
+const pending = new Map();
+function setStatus(state, text) { statusEl.dataset.state = state; statusEl.textContent = text; statusEl.title = text; }
+
+function startWorker() {
+  ready = false;
+  const blob = new Blob([$('worker-src').textContent], { type: 'text/javascript' });
+  worker = new Worker(URL.createObjectURL(blob));
+  worker.onmessage = onWorkerMessage;
+  worker.onerror = (e) => { setStatus('error', 'Worker error'); log(String(e.message || e), 'err'); };
+  setStatus('loading', 'Starting Pyodide…');
+  worker.postMessage({ cmd: 'init', indexURL: PYODIDE_URL, skfem: SKFEM_SPEC, helper: $('py-helper').textContent });
+}
+function call(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const id = ++reqId;
+    pending.set(id, { resolve, reject });
+    worker.postMessage(Object.assign({ cmd, id }, args));
+  });
+}
+let versionText = '';
+function onWorkerMessage(ev) {
+  const m = ev.data;
+  if (m.type === 'progress') {
+    setStatus('loading', m.text);
+    $('emptyMsg').textContent = m.text;
+    $('loadBar').style.width = Math.round(m.frac * 100) + '%';
+  } else if (m.type === 'ready') {
+    ready = true;
+    versionText = `${m.version.split(' · ')[0]} · Pyodide ${m.pyodide}`;
+    setStatus('ready', versionText);
+    statusEl.title = `${m.version} · Pyodide ${m.pyodide}`;
+    $('loadBar').style.width = '100%';
+    log(`Ready: ${m.version} · Pyodide ${m.pyodide}`, 'info');
+    runBtn.disabled = false;
+    runScript();
+  } else if (m.type === 'stdout') {
+    log(m.text);
+  } else if (m.type === 'stderr') {
+    log(m.text, 'err');
+  } else if (m.type === 'error' && !m.id) {
+    setStatus('error', 'Failed to start Python');
+    $('emptyTitle').textContent = 'Python could not be loaded';
+    $('emptyMsg').textContent = m.text + ' — check the network connection and reload the page.';
+    log(m.text, 'err');
+  } else {
+    const p = pending.get(m.id);
+    if (!p) return;
+    pending.delete(m.id);
+    if (m.type === 'error') p.reject(new Error(m.text)); else p.resolve(m);
+  }
+}
+function setBusy(b, text) {
+  busy = b;
+  runBtn.disabled = b || !ready;
+  stopBtn.hidden = !b;
+  setStatus(b ? 'busy' : 'ready', b ? text : versionText);
+}
+stopBtn.addEventListener('click', () => {
+  worker.terminate();
+  for (const p of pending.values()) p.reject(new Error('Stopped'));
+  pending.clear();
+  busy = false; stopBtn.hidden = true; runBtn.disabled = true;
+  log('Stopped. Restarting Python…', 'err');
+  startWorker();
+});
+runBtn.addEventListener('click', () => runScript());
+
+let items = [], lastLabel = store.get('field');
+async function runScript() {
+  if (!ready || busy) return;
+  runCount++;
+  setBusy(true, 'Running script…');
+  con.textContent = '';
+  log(`Run ${runCount}`, 'info');
+  setError(null);
+  let res;
+  try {
+    const r = await call('run', { code: ta.value });
+    res = JSON.parse(r.json);
+  } catch (e) {
+    log(String(e.message || e), 'err'); setBusy(false); return;
+  }
+  setBusy(false);
+  if (res.error) {
+    log(res.error, 'err');
+    if (res.errline) setError(res.errline);
+  }
+  if (res.inspect_error) log('Inspection failed:\n' + res.inspect_error, 'err');
+  log(`${res.error ? 'Failed' : 'Finished'} in ${res.elapsed.toFixed(3)} s · ${res.items.filter((i) => i.kind === 'field').length} plottable fields`, res.error ? 'err' : 'ok');
+  setItems(res.items);
+}
+
+/* =====================================================================
+   Field selection
+   ===================================================================== */
+const fieldSel = $('fieldSel'), subSel = $('subSel');
+function setItems(list) {
+  items = list;
+  fieldSel.innerHTML = '';
+  if (!list.length) {
+    fieldSel.add(new Option('No mesh or field in namespace', ''));
+    fieldSel.disabled = true;
+    showScene(null);
+    return;
+  }
+  fieldSel.disabled = false;
+  const meshes = list.filter((i) => i.kind === 'mesh');
+  if (meshes.length) {
+    const g = document.createElement('optgroup'); g.label = 'Mesh only';
+    for (const it of meshes) g.appendChild(new Option(`${it.label}  (${it.sub})`, it.id));
+    fieldSel.appendChild(g);
+  }
+  const groups = new Map();
+  for (const it of list.filter((i) => i.kind === 'field')) {
+    const key = `${it.basis} · ${it.sub} · N = ${it.N}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  }
+  for (const [key, arr] of groups) {
+    const g = document.createElement('optgroup'); g.label = key;
+    for (const it of arr) g.appendChild(new Option(it.label, it.id));
+    fieldSel.appendChild(g);
+  }
+  const fields = list.filter((i) => i.kind === 'field');
+  const pick = list.find((i) => i.label === lastLabel)
+    || fields.find((i) => /^u\b/.test(i.label))
+    || fields.find((i) => !/^(b|f)\b/.test(i.label))
+    || fields[0] || list[0];
+  fieldSel.value = String(pick.id);
+  loadItem();
+}
+fieldSel.addEventListener('change', () => {
+  const it = items.find((i) => String(i.id) === fieldSel.value);
+  if (it) { lastLabel = it.label; store.set('field', it.label); }
+  loadItem();
+});
+subSel.addEventListener('change', loadItem);
+
+let loadSeq = 0;
+async function loadItem() {
+  const it = items.find((i) => String(i.id) === fieldSel.value);
+  if (!it || !ready) return;
+  const seq = ++loadSeq;
+  let nref = subSel.value;
+  if (nref === 'auto') nref = -1;
+  // auto: fine sampling in 1D, one level in 2D, none in 3D
+  const guess = nref === -1 ? (/Line/.test(it.mesh || it.sub) ? 3 : /Tet|Hex/.test(it.mesh || it.sub) ? 0 : 1) : +nref;
+  setBusy(true, 'Preparing view…');
+  try {
+    const r = await call('payload', { item: it.id, nref: guess });
+    if (seq !== loadSeq) return;
+    showScene(decodePayload(r.data));
+  } catch (e) {
+    log('Visualization failed: ' + e.message, 'err');
+  } finally {
+    if (seq === loadSeq) setBusy(false);
+  }
+}
+function decodePayload(d) {
+  const meta = JSON.parse(d.meta);
+  const f32 = (b) => (b ? new Float32Array(b) : null);
+  const i32 = (b) => (b ? new Int32Array(b) : null);
+  return { meta, P: f32(d.P), C: i32(d.C), E: i32(d.E), V: f32(d.V), D: f32(d.D), W: i32(d.W), Pv: f32(d.Pv) };
+}
+
+/* =====================================================================
+   Colormaps
+   ===================================================================== */
+const CMAPS = {
+  viridis: ['#440154', '#482878', '#3e4989', '#31688e', '#26828e', '#1f9e89', '#35b779', '#6ece58', '#b5de2b', '#fde725'],
+  turbo: ['#30123b', '#4145ab', '#4675ed', '#39a2fc', '#1bcfd4', '#24eca6', '#61fc6c', '#a4fc3b', '#d1e834', '#f3c63a', '#fe9b2d', '#f36315', '#d93806', '#b11901', '#7a0402'],
+  coolwarm: ['#3b4cc0', '#6282ea', '#8db0fe', '#b8d0f9', '#dddcdc', '#f5c4ac', '#f39b7a', '#de604d', '#b40426'],
+  magma: ['#000004', '#1c1044', '#4f127b', '#812581', '#b5367a', '#e55964', '#fb8761', '#fec287', '#fcfdbf'],
+  grey: ['#1d1d1f', '#f2f2f2'],
+};
+const LUT = { r: new Uint8Array(256), g: new Uint8Array(256), b: new Uint8Array(256) };
+const EDGE_DARK = [10, 16, 24], EDGE_LIGHT = [235, 242, 248];
+function hex2rgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function buildLut(name) {
+  const stops = CMAPS[name].map(hex2rgb), k = stops.length - 1;
+  for (let i = 0; i < 256; i++) {
+    const t = (i / 255) * k, j = Math.min(k - 1, Math.floor(t)), f = t - j;
+    LUT.r[i] = Math.round(stops[j][0] + (stops[j + 1][0] - stops[j][0]) * f);
+    LUT.g[i] = Math.round(stops[j][1] + (stops[j + 1][1] - stops[j][1]) * f);
+    LUT.b[i] = Math.round(stops[j][2] + (stops[j + 1][2] - stops[j][2]) * f);
+  }
+}
+
+/* =====================================================================
+   Viewer: software rasterizer (z-buffer, Gouraud field shading) + 1D plot
+   ===================================================================== */
+const cv = $('view'), ctx = cv.getContext('2d');
+const stage = $('stage');
+let scene = null;
+const view = { R: [1, 0, 0, 0, 1, 0, 0, 0, 1], zoom: 1, panX: 0, panY: 0, base: 1, x0: 0, x1: 1 };
+const opts = { cmap: 'viridis', bands: 0, edges: true, warp: false, warpAmt: 0.35, deform: false, defAmt: 0.5, clipAxis: -1, clipPos: 0.5, clipFlip: false };
+let img = null, zbuf = null, vbuf = null, W = 0, H = 0, dpr = 1;
+let renderQueued = false;
+
+function cssColor(name) {
+  const c = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (c.startsWith('#')) return hex2rgb(c.length === 4 ? '#' + [...c.slice(1)].map((x) => x + x).join('') : c);
+  const m = c.match(/\d+(\.\d+)?/g);
+  return m ? m.slice(0, 3).map(Number) : [128, 128, 128];
+}
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(stage.clientWidth * dpr)), h = Math.max(1, Math.round(stage.clientHeight * dpr));
+  if (w !== cv.width || h !== cv.height) {
+    cv.width = w; cv.height = h; W = w; H = h;
+    img = null;
+    if (scene) fitView(false);
+    requestRender();
+  }
+}
+new ResizeObserver(resize).observe(stage);
+function requestRender() { if (!renderQueued) { renderQueued = true; requestAnimationFrame(render); } }
+
+const rotX = (a) => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, c, -s, 0, s, c]; };
+const rotY = (a) => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
+const rotZ = (a) => { const c = Math.cos(a), s = Math.sin(a); return [c, -s, 0, s, c, 0, 0, 0, 1]; };
+function mul(A, B) {
+  const C = new Array(9);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[3 * i + j] = A[3 * i] * B[j] + A[3 * i + 1] * B[3 + j] + A[3 * i + 2] * B[6 + j];
+  return C;
+}
+const VIEWS = {
+  xy: () => [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  xz: () => rotX(-Math.PI / 2),
+  yz: () => mul(rotX(-Math.PI / 2), rotZ(-Math.PI / 2)),
+  iso: () => mul(rotX(-1.0), rotZ(-0.65)),
+};
+
+function fmt(v) {
+  if (!isFinite(v)) return String(v);
+  const a = Math.abs(v);
+  if (a === 0) return '0';
+  if (a >= 1e5 || a < 1e-3) return v.toExponential(2).replace('e+', 'e');
+  return String(+v.toPrecision(4));
+}
+
+/* ----- scene preparation ----- */
+function resetDisplayOptions() {
+  opts.warp = false; opts.deform = false; opts.clipAxis = -1;
+  $('warpChk').checked = false; $('defChk').checked = false; $('clipSel').value = '-1';
+  view.kind = '';
+}
+function showScene(s) {
+  scene = s;
+  const has = !!s;
+  $('empty').hidden = has;
+  if (!has) {
+    $('emptyTitle').textContent = 'Nothing to show';
+    $('emptyMsg').textContent = 'The script did not leave a mesh or a solution array in its namespace.';
+    $('loadBar').parentElement.hidden = true;
+    ['info', 'cbar', 'readout', 'hint'].forEach((id) => { $(id).hidden = true; });
+    ctx.clearRect(0, 0, W, H);
+    return;
+  }
+  const meta = s.meta;
+  const base = meta.label.split('  ')[0] + '@' + (meta.basis || '') + '@' + meta.mesh;
+  if (base !== view.base_field) { if (view.base_field) resetDisplayOptions(); view.base_field = base; }
+  const g = meta.gdim, n = s.P.length / g;
+  s.n = n;
+  s.mode = meta.dim === 1 && g === 1 ? '1d' : (meta.dim === 3 ? '3d' : (g === 3 ? 'surf' : '2d'));
+  // bounding box
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n; i++) for (let k = 0; k < g; k++) { const x = s.P[i * g + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; }
+  for (let k = g; k < 3; k++) { lo[k] = 0; hi[k] = 0; }
+  s.lo = lo; s.hi = hi;
+  s.radius = Math.max(1e-12, 0.5 * Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]));
+  s.hasField = !!s.V;
+  if (s.hasField) {
+    s.vmin = meta.vmin; s.vmax = meta.vmax;
+    if (!(s.vmax > s.vmin)) { const c = s.vmin; s.vmin = c - 0.5 * (Math.abs(c) || 1); s.vmax = c + 0.5 * (Math.abs(c) || 1); }
+  }
+  s.sx = new Float32Array(n); s.sy = new Float32Array(n); s.sz = new Float32Array(n);
+  // element centroids for clipping
+  const nl = meta.nloc;
+  s.cent = new Float32Array(meta.nel * 3);
+  for (let e = 0; e < meta.nel; e++) for (let k = 0; k < g; k++) {
+    let acc = 0; for (let j = 0; j < nl; j++) acc += s.P[(e * nl + j) * g + k];
+    s.cent[e * 3 + k] = acc / nl;
+  }
+  // controls availability
+  $('warpGrp').hidden = !(s.mode === '2d' && s.hasField);
+  $('defGrp').hidden = !s.D;
+  $('clipGrp').hidden = s.mode !== '3d';
+  $('viewGrp').hidden = s.mode === '1d';
+  $('cbar').hidden = !(s.hasField && s.mode !== '1d');
+  $('hint').hidden = false;
+  $('readout').hidden = true;
+  const sameKind = view.kind === s.mode + meta.mesh;
+  if (!sameKind) {
+    view.kind = s.mode + meta.mesh;
+    view.R = s.mode === '3d' ? VIEWS.iso() : VIEWS.xy();
+    view.zoom = 1; view.panX = 0; view.panY = 0;
+    view.x0 = lo[0]; view.x1 = hi[0];
+  }
+  if (s.mode === '1d') { view.x0 = Math.min(Math.max(view.x0, lo[0]), hi[0]); if (!(view.x1 > view.x0)) { view.x0 = lo[0]; view.x1 = hi[0]; } }
+  prepareGeometry();
+  fitView(!sameKind);
+  updateInfo();
+  drawColorbar();
+  requestRender();
+}
+
+function prepareGeometry() {
+  const s = scene;
+  if (!s || s.mode === '1d') return;
+  const meta = s.meta, nvc = meta.nvc, nsub = meta.nsub, C = s.C;
+  // which elements survive the clip plane
+  const keep = new Uint8Array(meta.nel).fill(1);
+  if (s.mode === '3d' && opts.clipAxis >= 0) {
+    const a = opts.clipAxis, lo = s.lo[a], span = (s.hi[a] - lo) || 1;
+    for (let e = 0; e < meta.nel; e++) {
+      const t = (s.cent[e * 3 + a] - lo) / span;
+      keep[e] = opts.clipFlip ? (t >= opts.clipPos ? 1 : 0) : (t <= opts.clipPos ? 1 : 0);
+    }
+  }
+  const tris = [];
+  if (s.mode === '3d') {
+    // boundary faces of the kept set: faces seen once (after welding coincident points)
+    const Wd = s.W, faces = meta.faces;
+    let maxW = 0; for (let i = 0; i < Wd.length; i++) if (Wd[i] > maxW) maxW = Wd[i];
+    const N = maxW + 1, big = N > 200000;
+    const cnt = new Map();
+    const ncells = C.length / nvc;
+    const ids = [0, 0, 0, 0];
+    for (let c = 0; c < ncells; c++) {
+      if (!keep[(c / nsub) | 0]) continue;
+      for (let f = 0; f < faces.length; f++) {
+        const fl = faces[f];
+        for (let j = 0; j < fl.length; j++) ids[j] = Wd[C[c * nvc + fl[j]]];
+        const sorted = ids.slice(0, fl.length).sort((x, y) => x - y);
+        const key = big ? sorted.slice(0, 3).join(',') : sorted[0] + N * (sorted[1] + N * sorted[2]);
+        const prev = cnt.get(key);
+        if (prev === undefined) cnt.set(key, c * 8 + f); else cnt.set(key, -1);
+      }
+    }
+    for (const v of cnt.values()) {
+      if (v < 0) continue;
+      const c = Math.floor(v / 8), fl = faces[v % 8];
+      const p0 = C[c * nvc + fl[0]];
+      for (let j = 1; j + 1 < fl.length; j++) tris.push(p0, C[c * nvc + fl[j]], C[c * nvc + fl[j + 1]]);
+    }
+  } else {
+    const poly = meta.poly, ncells = C.length / nvc;
+    for (let c = 0; c < ncells; c++) {
+      const p0 = C[c * nvc + poly[0]];
+      for (let j = 1; j + 1 < poly.length; j++) tris.push(p0, C[c * nvc + poly[j]], C[c * nvc + poly[j + 1]]);
+    }
+  }
+  s.tris = new Int32Array(tris);
+  // wireframe edges of the kept elements, deduplicated
+  const E = s.E, epe = meta.epe, Wd = s.W, edges = [], seen = new Set();
+  let N = 0; if (Wd) for (let i = 0; i < Wd.length; i++) if (Wd[i] >= N) N = Wd[i] + 1;
+  for (let k = 0; k < E.length / 2; k++) {
+    if (!keep[(k / epe) | 0]) continue;
+    const a = E[2 * k], b = E[2 * k + 1];
+    if (Wd) {
+      const wa = Wd[a], wb = Wd[b];
+      const key = wa < wb ? wa * N + wb : wb * N + wa;
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    edges.push(a, b);
+  }
+  s.edges = new Int32Array(edges);
+}
+
+function warpHeight() { return opts.warpAmt * 2 * scene.radius; }
+function defScale() {
+  const s = scene;
+  if (!s.D || !opts.deform || !s.meta.dmax) return 0;
+  const auto = 0.12 * s.radius / s.meta.dmax;
+  return auto * Math.pow(10, (opts.defAmt - 0.5) * 3);
+}
+function position(i, out, ds, wh) {
+  const s = scene, g = s.meta.gdim, P = s.P;
+  let x = P[i * g], y = g > 1 ? P[i * g + 1] : 0, z = g > 2 ? P[i * g + 2] : 0;
+  if (ds) { const D = s.D; x += ds * D[i * g]; if (g > 1) y += ds * D[i * g + 1]; if (g > 2) z += ds * D[i * g + 2]; }
+  if (wh) z += (s.V[i] - s.vmin) / (s.vmax - s.vmin) * wh;
+  out[0] = x; out[1] = y; out[2] = z;
+}
+function sceneCenter() {
+  const s = scene, wh = s.mode === '2d' && opts.warp && s.hasField ? warpHeight() : 0;
+  return [(s.lo[0] + s.hi[0]) / 2, (s.lo[1] + s.hi[1]) / 2, (s.lo[2] + s.hi[2]) / 2 + wh / 2];
+}
+function fitView(resetPanZoom) {
+  const s = scene;
+  if (!s || s.mode === '1d') return;
+  if (resetPanZoom) { view.zoom = 1; view.panX = 0; view.panY = 0; }
+  const wh = s.mode === '2d' && opts.warp && s.hasField ? warpHeight() : 0;
+  const R = view.R;
+  let mx = 1e-12, my = 1e-12;
+  const c = sceneCenter();
+  for (let i = 0; i < 8; i++) {
+    const x = (i & 1 ? s.hi[0] : s.lo[0]) - c[0], y = (i & 2 ? s.hi[1] : s.lo[1]) - c[1], z = (i & 4 ? s.hi[2] + wh : s.lo[2]) - c[2];
+    mx = Math.max(mx, Math.abs(R[0] * x + R[1] * y + R[2] * z));
+    my = Math.max(my, Math.abs(R[3] * x + R[4] * y + R[5] * z));
+  }
+  const padTop = 54 * dpr, padSide = (s.hasField ? 100 : 24) * dpr;
+  view.base = Math.min((W - 2 * padSide) / (2 * mx), (H - 2 * padTop) / (2 * my));
+  if (!(view.base > 0)) view.base = Math.min(W, H) / (2 * s.radius);
+}
+
+/* ----- rendering ----- */
+function render() {
+  renderQueued = false;
+  if (!scene || !W) return;
+  if (scene.mode === '1d') return render1d();
+  const s = scene;
+  if (!img || img.width !== W || img.height !== H) {
+    img = ctx.createImageData(W, H); zbuf = new Float32Array(W * H); vbuf = new Float32Array(W * H);
+  }
+  const pix = new Uint32Array(img.data.buffer);
+  const bg = cssColor('--canvas'), ec = cssColor('--edge'), mf = cssColor('--mesh-face');
+  pix.fill((255 << 24) | (bg[2] << 16) | (bg[1] << 8) | bg[0]);
+  zbuf.fill(-Infinity); vbuf.fill(NaN);
+  const R = view.R, sc = view.base * view.zoom, cx = W / 2 + view.panX, cy = H / 2 + view.panY;
+  const ds = defScale(), wh = s.mode === '2d' && opts.warp && s.hasField ? warpHeight() : 0;
+  const c = sceneCenter(), p = [0, 0, 0];
+  const sx = s.sx, sy = s.sy, sz = s.sz;
+  for (let i = 0; i < s.n; i++) {
+    position(i, p, ds, wh);
+    const x = p[0] - c[0], y = p[1] - c[1], z = p[2] - c[2];
+    sx[i] = cx + sc * (R[0] * x + R[1] * y + R[2] * z);
+    sy[i] = cy - sc * (R[3] * x + R[4] * y + R[5] * z);
+    sz[i] = sc * (R[6] * x + R[7] * y + R[8] * z);
+  }
+  const V = s.V, hasF = s.hasField, vmin = s.vmin, ir = 1 / (s.vmax - s.vmin), nb = opts.bands;
+  const lr = LUT.r, lg = LUT.g, lb = LUT.b;
+  const T = s.tris;
+  for (let t = 0; t < T.length; t += 3) {
+    const a = T[t], b = T[t + 1], d = T[t + 2];
+    const x0 = sx[a], y0 = sy[a], z0 = sz[a], x1 = sx[b], y1 = sy[b], z1 = sz[b], x2 = sx[d], y2 = sy[d], z2 = sz[d];
+    const area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+    if (Math.abs(area) < 1e-9) continue;
+    // headlight shading from the face normal (two-sided)
+    const ux = x1 - x0, uy = y1 - y0, uz = z1 - z0, vx = x2 - x0, vy = y2 - y0, vz = z2 - z0;
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const light = 0.38 + 0.62 * Math.abs(nz) / (Math.hypot(nx, ny, nz) || 1);
+    let minX = Math.max(0, Math.floor(Math.min(x0, x1, x2))), maxX = Math.min(W - 1, Math.ceil(Math.max(x0, x1, x2)));
+    let minY = Math.max(0, Math.floor(Math.min(y0, y1, y2))), maxY = Math.min(H - 1, Math.ceil(Math.max(y0, y1, y2)));
+    if (minX > maxX || minY > maxY) continue;
+    const ia = 1 / area;
+    const A0 = (y1 - y2) * ia, B0 = (x2 - x1) * ia, C0 = (x1 * y2 - x2 * y1) * ia;
+    const A1 = (y2 - y0) * ia, B1 = (x0 - x2) * ia, C1 = (x2 * y0 - x0 * y2) * ia;
+    const va = hasF ? V[a] : 0, vb = hasF ? V[b] : 0, vd = hasF ? V[d] : 0;
+    const fr = (mf[0] * light) | 0, fg = (mf[1] * light) | 0, fb = (mf[2] * light) | 0;
+    const flat = (255 << 24) | (fb << 16) | (fg << 8) | fr;
+    for (let y = minY; y <= maxY; y++) {
+      const py = y + 0.5;
+      let w0 = A0 * (minX + 0.5) + B0 * py + C0, w1 = A1 * (minX + 0.5) + B1 * py + C1;
+      let row = y * W + minX;
+      for (let x = minX; x <= maxX; x++, w0 += A0, w1 += A1, row++) {
+        const w2 = 1 - w0 - w1;
+        if (w0 < -1e-5 || w1 < -1e-5 || w2 < -1e-5) continue;
+        const z = w0 * z0 + w1 * z1 + w2 * z2;
+        if (z <= zbuf[row]) continue;
+        zbuf[row] = z;
+        if (hasF) {
+          const v = w0 * va + w1 * vb + w2 * vd;
+          vbuf[row] = v;
+          let q = (v - vmin) * ir;
+          q = q < 0 ? 0 : q > 1 ? 1 : q;
+          if (nb) q = Math.min(nb - 1, Math.floor(q * nb)) / (nb - 1);
+          const k = (q * 255 + 0.5) | 0;
+          pix[row] = (255 << 24) | (((lb[k] * light) | 0) << 16) | (((lg[k] * light) | 0) << 8) | ((lr[k] * light) | 0);
+        } else {
+          vbuf[row] = 0;
+          pix[row] = flat;
+        }
+      }
+    }
+  }
+  if (opts.edges) {
+    const Ed = s.edges, alpha = hasF ? 0.32 : 0.55, zeps = 2.0 * dpr + 0.004 * sc * s.radius;
+    const thick = dpr >= 1.5;
+    for (let k = 0; k < Ed.length; k += 2) {
+      const a = Ed[k], b = Ed[k + 1];
+      const x0 = sx[a], y0 = sy[a], z0 = sz[a], dx = sx[b] - x0, dy = sy[b] - y0, dz = sz[b] - z0;
+      const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)));
+      if (steps > 20000) continue;
+      for (let i = 0; i <= steps; i++) {
+        const f = steps ? i / steps : 0;
+        const px = (x0 + dx * f) | 0, py = (y0 + dy * f) | 0;
+        if (px < 0 || py < 0 || px >= W || py >= H) continue;
+        const idx = py * W + px, z = z0 + dz * f;
+        if (z < zbuf[idx] - zeps) continue;
+        blend(pix, idx, ec, alpha);
+        if (thick && px + 1 < W && Math.abs(dy) > Math.abs(dx) && !(z < zbuf[idx + 1] - zeps)) blend(pix, idx + 1, ec, alpha * 0.5);
+        else if (thick && py + 1 < H && !(z < zbuf[idx + W] - zeps)) blend(pix, idx + W, ec, alpha * 0.5);
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+function blend(pix, idx, c0, a) {
+  const v = pix[idx], r = v & 255, g = (v >> 8) & 255, b = (v >> 16) & 255;
+  // contrast-adaptive: dark lines on light surfaces, light lines on dark ones
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  const c = lum > 80 ? EDGE_DARK : EDGE_LIGHT;
+  if (lum <= 80) a *= 0.7;
+  pix[idx] = (255 << 24) | (((b + (c[2] - b) * a) | 0) << 16) | (((g + (c[1] - g) * a) | 0) << 8) | ((r + (c[0] - r) * a) | 0);
+}
+
+/* ----- 1D plot ----- */
+function niceTicks(a, b, n) {
+  const span = b - a; if (!(span > 0)) return [a];
+  const step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map((x) => x * mag).find((x) => span / x <= n) || 10 * mag;
+  const out = []; for (let v = Math.ceil(a / step) * step; v <= b + 1e-9 * span; v += step) out.push(Math.abs(v) < 1e-12 * step ? 0 : v);
+  return out;
+}
+let plot1d = null;
+function render1d() {
+  const s = scene, meta = s.meta;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const bg = cssColor('--canvas');
+  ctx.fillStyle = `rgb(${bg})`; ctx.fillRect(0, 0, W, H);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = W / dpr, h = H / dpr;
+  const L = 64, Rm = 28, T = 72, B = 76;
+  let ylo, yhi;
+  if (s.hasField) { const pad = 0.08 * (s.vmax - s.vmin); ylo = s.vmin - pad; yhi = s.vmax + pad; }
+  else { ylo = -1; yhi = 1; }
+  const x0 = view.x0, x1 = view.x1;
+  const X = (x) => L + (x - x0) / (x1 - x0) * (w - L - Rm);
+  const Y = (y) => h - B - (y - ylo) / (yhi - ylo) * (h - T - B);
+  plot1d = { X, Y, x0, x1, L, Rm, w };
+  const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const line = getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  ctx.font = '11px "JetBrains Mono", ui-monospace, monospace';
+  ctx.lineWidth = 1;
+  // grid + ticks
+  ctx.strokeStyle = line; ctx.fillStyle = muted;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const t of niceTicks(x0, x1, Math.max(3, Math.floor((w - L - Rm) / 90)))) {
+    const px = Math.round(X(t)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(px, T); ctx.lineTo(px, h - B); ctx.stroke();
+    ctx.fillText(fmt(t), px, h - B + 18);
+  }
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  if (s.hasField) for (const t of niceTicks(ylo, yhi, Math.max(3, Math.floor((h - T - B) / 50)))) {
+    const py = Math.round(Y(t)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(L, py); ctx.lineTo(w - Rm, py); ctx.stroke();
+    ctx.fillText(fmt(t), L - 8, py);
+  }
+  ctx.save();
+  ctx.beginPath(); ctx.rect(L, T - 8, w - L - Rm, h - T - B + 16); ctx.clip();
+  // mesh nodes on the axis
+  ctx.strokeStyle = ink; ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  const ya = h - B;
+  ctx.moveTo(L, ya + 0.5); ctx.lineTo(w - Rm, ya + 0.5);
+  if (s.Pv) for (const x of s.Pv) { const px = Math.round(X(x)) + 0.5; ctx.moveTo(px, ya - 5); ctx.lineTo(px, ya + 5); }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  const nvc = meta.nvc, C = s.C, P = s.P, nl = meta.nloc;
+  if (s.hasField) {
+    ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let c = 0; c < C.length; c += nvc) { const a = C[c], b = C[c + 1]; ctx.moveTo(X(P[a]), Y(s.V[a])); ctx.lineTo(X(P[b]), Y(s.V[b])); }
+    ctx.stroke();
+    if (opts.edges) {
+      ctx.fillStyle = accent;
+      for (let e = 0; e < meta.nel; e++) for (const j of [0, 1]) {
+        const i = e * nl + j; ctx.beginPath(); ctx.arc(X(P[i]), Y(s.V[i]), 2.6, 0, 2 * Math.PI); ctx.fill();
+      }
+    }
+  } else {
+    ctx.fillStyle = accent;
+    for (let e = 0; e < meta.nel; e++) for (const j of [0, 1]) { const i = e * nl + j; ctx.beginPath(); ctx.arc(X(P[i]), Y(0), 3, 0, 2 * Math.PI); ctx.fill(); }
+    ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(s.lo[0]), Y(0)); ctx.lineTo(X(s.hi[0]), Y(0)); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = muted; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('x', (L + w - Rm) / 2, h - B + 36);
+  if (hover1d !== null && s.hasField) {
+    const px = X(hover1d.x);
+    ctx.strokeStyle = muted; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, T); ctx.lineTo(px, h - B); ctx.stroke(); ctx.setLineDash([]);
+    if (hover1d.v !== null) { ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(px, Y(hover1d.v), 3.5, 0, 2 * Math.PI); ctx.fill(); }
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+let hover1d = null;
+function sample1d(x) {
+  const s = scene, C = s.C, P = s.P, nvc = s.meta.nvc;
+  for (let c = 0; c < C.length; c += nvc) {
+    const a = C[c], b = C[c + 1], xa = P[a], xb = P[b];
+    if ((x - xa) * (x - xb) <= 0 && xa !== xb) { const f = (x - xa) / (xb - xa); return s.V[a] + f * (s.V[b] - s.V[a]); }
+  }
+  return null;
+}
+
+/* ----- overlays ----- */
+function updateInfo() {
+  if (!scene) return;
+  const s = scene, m = s.meta;
+  const lines = [`<b>${esc(m.mesh)}</b> · ${m.nelements.toLocaleString()} elements · ${m.nvertices.toLocaleString()} vertices`];
+  if (s.hasField) {
+    lines.push(`<code>${esc(m.label.trim())}</code> in <code>${esc(m.basis)}</code> · ${esc(m.element)} · N = ${m.N.toLocaleString()}`);
+    lines.push(`min ${fmt(m.vmin)} · max ${fmt(m.vmax)}` + (s.D && opts.deform ? ` · deformation ×${fmt(defScale())}` : ''));
+  }
+  $('info').innerHTML = lines.join('<br>');
+  $('info').hidden = false;
+  $('hint').style.bottom = s.mode === '1d' ? 'auto' : '';
+  $('hint').style.top = s.mode === '1d' ? '10px' : '';
+  $('hint').textContent = s.mode === '1d' ? 'wheel zoom · drag pan · double-click reset'
+    : s.mode === '2d' && !opts.warp && !opts.deform ? 'drag pan · wheel zoom · alt-drag rotate · double-click reset'
+    : 'drag rotate · shift-drag pan · wheel zoom · double-click reset';
+  $('defLbl').textContent = s.D ? '×' + fmt(defScale() || 0.12 * s.radius / (m.dmax || 1) * Math.pow(10, (opts.defAmt - 0.5) * 3)) : '';
+}
+function drawColorbar() {
+  const s = scene;
+  if (!s || !s.hasField || s.mode === '1d') return;
+  const c = $('cbarCv'), g = c.getContext('2d'), h = c.height, nb = opts.bands;
+  for (let y = 0; y < h; y++) {
+    let q = 1 - y / (h - 1);
+    if (nb) q = Math.min(nb - 1, Math.floor(q * nb)) / (nb - 1);
+    const k = Math.round(q * 255);
+    g.fillStyle = `rgb(${LUT.r[k]},${LUT.g[k]},${LUT.b[k]})`; g.fillRect(0, y, c.width, 1);
+  }
+  const ticks = $('cbarTicks'); ticks.innerHTML = '';
+  const n = 4;
+  for (let i = 0; i <= n; i++) {
+    let v = s.vmax - (s.vmax - s.vmin) * i / n;
+    if (Math.abs(v) < 1e-9 * (s.vmax - s.vmin)) v = 0;
+    const sp = document.createElement('span'); sp.style.top = (i / n * 100) + '%'; sp.textContent = fmt(v);
+    ticks.appendChild(sp);
+  }
+}
+
+/* ----- interaction ----- */
+const pointers = new Map();
+let drag = null, pinch = null;
+function isFlat2d() { return scene && scene.mode === '2d' && !opts.warp && !opts.deform; }
+cv.addEventListener('pointerdown', (e) => {
+  if (!scene) return;
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), zoom: view.zoom, x0: view.x0, x1: view.x1 };
+    drag = null;
+    return;
+  }
+  const pan = e.shiftKey || e.button === 1 || e.button === 2 || e.ctrlKey || (isFlat2d() && !e.altKey) || scene.mode === '1d';
+  drag = { x: e.clientX, y: e.clientY, pan };
+  cv.classList.add('dragging');
+});
+cv.addEventListener('pointermove', (e) => {
+  if (!scene) return;
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const f = Math.hypot(a.x - b.x, a.y - b.y) / (pinch.d || 1);
+    if (scene.mode === '1d') { const mid = (pinch.x0 + pinch.x1) / 2, hw = (pinch.x1 - pinch.x0) / 2 / f; view.x0 = mid - hw; view.x1 = mid + hw; }
+    else view.zoom = pinch.zoom * f;
+    requestRender();
+    return;
+  }
+  if (drag) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.x = e.clientX; drag.y = e.clientY;
+    if (scene.mode === '1d') {
+      const span = view.x1 - view.x0, wpx = plot1d ? plot1d.w - plot1d.L - plot1d.Rm : 400;
+      view.x0 -= dx / wpx * span; view.x1 -= dx / wpx * span;
+    } else if (drag.pan) { view.panX += dx * dpr; view.panY += dy * dpr; }
+    else { view.R = mul(rotX(dy * 0.008), mul(rotY(dx * 0.008), view.R)); }
+    requestRender();
+  }
+  hover(e);
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (!pointers.size) { drag = null; cv.classList.remove('dragging'); }
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('pointerleave', () => { $('readout').hidden = true; if (hover1d) { hover1d = null; requestRender(); } });
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+cv.addEventListener('wheel', (e) => {
+  if (!scene) return;
+  e.preventDefault();
+  const f = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015));
+  const r = cv.getBoundingClientRect();
+  if (scene.mode === '1d') {
+    if (!plot1d) return;
+    const mx = (e.clientX - r.left), xm = plot1d.x0 + (mx - plot1d.L) / (plot1d.w - plot1d.L - plot1d.Rm) * (plot1d.x1 - plot1d.x0);
+    view.x0 = xm - (xm - view.x0) / f; view.x1 = xm + (view.x1 - xm) / f;
+  } else {
+    const mx = (e.clientX - r.left) * dpr - W / 2, my = (e.clientY - r.top) * dpr - H / 2;
+    view.panX = mx - (mx - view.panX) * f; view.panY = my - (my - view.panY) * f;
+    view.zoom *= f;
+  }
+  requestRender();
+}, { passive: false });
+cv.addEventListener('dblclick', () => {
+  if (!scene) return;
+  if (scene.mode === '1d') { view.x0 = scene.lo[0]; view.x1 = scene.hi[0]; }
+  else { view.R = scene.mode === '3d' ? VIEWS.iso() : VIEWS.xy(); fitView(true); }
+  requestRender();
+});
+function hover(e) {
+  const r = cv.getBoundingClientRect(), ro = $('readout');
+  if (scene.mode === '1d') {
+    if (!plot1d || !scene.hasField) return;
+    const mx = e.clientX - r.left;
+    const x = plot1d.x0 + (mx - plot1d.L) / (plot1d.w - plot1d.L - plot1d.Rm) * (plot1d.x1 - plot1d.x0);
+    const v = sample1d(x);
+    hover1d = { x, v };
+    ro.hidden = false; ro.textContent = `x = ${fmt(x)}` + (v !== null ? `   value = ${fmt(v)}` : '');
+    requestRender();
+    return;
+  }
+  if (!vbuf || drag) return;
+  const px = Math.floor((e.clientX - r.left) * dpr), py = Math.floor((e.clientY - r.top) * dpr);
+  if (px < 0 || py < 0 || px >= W || py >= H) return;
+  const v = vbuf[py * W + px];
+  if (Number.isNaN(v)) { ro.hidden = true; return; }
+  let txt = '';
+  const R = view.R;
+  if (scene.mode === '2d' && Math.abs(R[8] - 1) < 1e-9 && !opts.warp) {
+    const sc = view.base * view.zoom, c = sceneCenter();
+    const vx = (px + 0.5 - W / 2 - view.panX) / sc, vy = -(py + 0.5 - H / 2 - view.panY) / sc;
+    txt = `x = ${fmt(c[0] + R[0] * vx + R[3] * vy)}   y = ${fmt(c[1] + R[1] * vx + R[4] * vy)}`;
+  }
+  if (scene.hasField) txt += (txt ? '   ' : '') + `value = ${fmt(v)}`;
+  ro.hidden = !txt; ro.textContent = txt;
+}
+
+/* ----- toolbar wiring ----- */
+$('cmapSel').addEventListener('change', (e) => { opts.cmap = e.target.value; buildLut(opts.cmap); drawColorbar(); requestRender(); store.set('cmap', opts.cmap); });
+$('bandSel').addEventListener('change', (e) => { opts.bands = +e.target.value; drawColorbar(); requestRender(); });
+$('edgeChk').addEventListener('change', (e) => { opts.edges = e.target.checked; requestRender(); });
+$('warpChk').addEventListener('change', (e) => {
+  opts.warp = e.target.checked;
+  if (opts.warp && scene && scene.mode === '2d' && Math.abs(view.R[8] - 1) < 1e-9) view.R = mul(rotX(-0.95), rotZ(-0.5));
+  if (!opts.warp && scene && scene.mode === '2d') view.R = VIEWS.xy();
+  fitView(true); updateInfo(); requestRender();
+});
+$('warpRng').addEventListener('input', (e) => { opts.warpAmt = e.target.value / 100; requestRender(); });
+$('defChk').addEventListener('change', (e) => { opts.deform = e.target.checked; updateInfo(); requestRender(); });
+$('defRng').addEventListener('input', (e) => { opts.defAmt = e.target.value / 100; updateInfo(); requestRender(); });
+$('clipSel').addEventListener('change', (e) => {
+  opts.clipAxis = +e.target.value;
+  // keep the half whose cut face points toward the camera
+  if (opts.clipAxis >= 0) { opts.clipFlip = view.R[6 + opts.clipAxis] < 0; $('clipFlip').checked = opts.clipFlip; }
+  prepareGeometry(); requestRender();
+});
+$('clipFlip').addEventListener('change', (e) => { opts.clipFlip = e.target.checked; prepareGeometry(); requestRender(); });
+let clipQueued = false;
+$('clipRng').addEventListener('input', (e) => {
+  opts.clipPos = e.target.value / 1000;
+  if (opts.clipAxis < 0) return;
+  if (!clipQueued) { clipQueued = true; requestAnimationFrame(() => { clipQueued = false; prepareGeometry(); render(); }); }
+});
+document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+  if (!scene) return;
+  view.R = VIEWS[b.dataset.view]();
+  fitView(true); requestRender();
+}));
+
+/* theme changes: re-render with new canvas colors */
+const rerenderTheme = () => { requestRender(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerenderTheme);
+new MutationObserver(rerenderTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* ----- pane splitter ----- */
+const splitter = $('splitter'), mainEl = $('main');
+splitter.addEventListener('pointerdown', (e) => {
+  splitter.setPointerCapture(e.pointerId); splitter.classList.add('drag');
+  const move = (ev) => {
+    const r = mainEl.getBoundingClientRect();
+    const f = Math.min(0.75, Math.max(0.2, (ev.clientX - r.left) / r.width));
+    mainEl.style.setProperty('--left', (f * 100).toFixed(1) + '%');
+  };
+  const up = () => { splitter.classList.remove('drag'); splitter.removeEventListener('pointermove', move); splitter.removeEventListener('pointerup', up); };
+  splitter.addEventListener('pointermove', move); splitter.addEventListener('pointerup', up);
+});
+splitter.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const cur = parseFloat(getComputedStyle(mainEl).getPropertyValue('--left')) || 44;
+  mainEl.style.setProperty('--left', Math.min(75, Math.max(20, cur + (e.key === 'ArrowLeft' ? -2 : 2))) + '%');
+});
+
+/* =====================================================================
+   Boot
+   ===================================================================== */
+(function boot() {
+  const cm = store.get('cmap');
+  if (cm && CMAPS[cm]) { opts.cmap = cm; $('cmapSel').value = cm; }
+  buildLut(opts.cmap);
+  const saved = store.get('script');
+  if (saved && saved.trim()) {
+    ta.value = saved;
+    const ex = EXAMPLES.find((x) => x.code.replace(M_LINE, '') === saved.replace(M_LINE, ''));
+    exampleSel.value = ex ? ex.id : 'custom';
+    onEdit();
+  } else {
+    loadExample('poisson');
+  }
+  refreshEditor();
+  resize();
+  startWorker();
+})();
+</script>
+</body>
+</html>
