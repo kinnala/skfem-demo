@@ -1241,6 +1241,7 @@ $('clearBtn').addEventListener('click', () => { con.textContent = ''; });
 const statusEl = $('status'), runBtn = $('runBtn'), stopBtn = $('stopBtn');
 let worker = null, ready = false, installed = false, busy = false, reqId = 0, runCount = 0;
 let skfemPromise = null, bootSource = Promise.resolve();
+let autoRun = true;          // run the script once Python is first ready, but not after Stop restarts it
 const pending = new Map();
 function setStatus(state, text) { statusEl.dataset.state = state; statusEl.textContent = text; statusEl.title = text; }
 function bootError(text) {
@@ -1297,7 +1298,7 @@ function onWorkerMessage(ev) {
     statusEl.title = `${m.version} · Pyodide ${m.pyodide}` + (skfemSource ? ` · scikit-fem from ${skfemSource}` : '');
     log(`Ready: ${statusEl.title}`, 'info');
     runBtn.disabled = false;
-    bootSource.then(() => runScript());
+    if (autoRun) { autoRun = false; bootSource.then(() => runScript()); }
   } else if (m.type === 'stdout') {
     log(m.text);
   } else if (m.type === 'stderr') {
